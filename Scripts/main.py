@@ -21,6 +21,7 @@ def main(args):
     df_1=df_1.dropna()
     df_2 = source_2[[args.pheno_col_2,args.icd_col_2]].copy()
     df_2=df_2.dropna()
+    df2_orig=df_2.copy()
     #FG has regex, the other has separate codes
     #aggregate second based on phecodes
     df_2 = df_2.groupby([args.pheno_col_2]).aggregate({args.icd_col_2:";".join}).reset_index()
@@ -34,6 +35,7 @@ def main(args):
     for entry in df_1_records:
         fg_dict[entry[args.pheno_col_1]] = entry[args.icd_col_1]
     out=[]
+    all_icd10 = df2_orig[args.icd_col_2].unique().apply(lambda x: x.replace(".","")).values
     phecodes={}
     phecodes["key"]=[]
     phecodes["value"]=[]
@@ -42,26 +44,42 @@ def main(args):
         phecodes["value"].append(value)
     cnt=0
     for (pheno,reg) in fg_dict.items():
+        #calculate normalizing constant for similarity v2
+        fg_set = set((a for a in all_icd10 if re.match(reg,a)))# amount of ICD10 matching to the regular expression in the ICD10-PheCode mapping
+        #that is the closest approximation to enumerating FG matches in the ICD10 that I can do without enumerating them
         entry={}
         entry["phenotype"]=pheno
         phecode_list=[]
         score_list=[]
+        score_v2 = []
         for value in phecodes["value"]:
             v=calculate_similarity(reg,value)
             score_list.append(v)
+            #similarity 2
+            union = fg_set.union(value)
+            intersect = fg_set.intersection(value)
+            sim_2 = len(intersect)/len(union)
+            score_v2.append(sim_2)
         idx = np.argmax(score_list)
+        idx2 = np.argmax(score_v2)
 
         
         entry["fg_icd10"]=reg
         if score_list[idx]>0:
-            entry["phecode"]=phecodes["key"][idx]
-            entry["phecode_icd10"]="|".join(phecodes["value"][idx])
-            entry["similarity"]=score_list[idx]
+            entry["phecode_1"]=phecodes["key"][idx]
+            entry["phecode_icd10_1"]="|".join(phecodes["value"][idx])
+            entry["similarity_1"]=score_list[idx]
+            entry["phecode_2"]=phecodes["key"][idx2]
+            entry["phecode_icd10_2"]="|".join(phecodes["value"][idx2])
+            entry["similarity_2"]=score_list[idx2]
             
         else:
-            entry["phecode"]=np.nan
-            entry["phecode_icd10"]=np.nan
-            entry["similarity"]=np.nan
+            entry["phecode_1"]=np.nan
+            entry["phecode_icd10_1"]=np.nan
+            entry["similarity_1"]=np.nan
+            entry["phecode_2"]=np.nan
+            entry["phecode_icd10_2"]=np.nan
+            entry["similarity_2"]=np.nan
         out.append(entry)
         if cnt%100 == 0:
             print("{:5.1f}%".format(cnt/len(fg_dict.keys())*100  ) )
