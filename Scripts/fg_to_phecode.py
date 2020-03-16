@@ -5,9 +5,9 @@ from expand_codes import *
 import re
 from typing import List, Dict, AbstractSet, Any
 
-def union_similarity(fg_set: AbstractSet[str], pheno_list: List[str]):
-    intersection = fg_set.intersection(pheno_list)
-    union = fg_set.union(pheno_list)
+def union_similarity(match_set: AbstractSet[str], match_list: List[str]):
+    intersection = match_set.intersection(match_list)
+    union = match_set.union(match_list)
     return len(intersection)/len(union)
 
 
