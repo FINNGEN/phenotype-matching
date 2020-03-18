@@ -25,7 +25,7 @@ def fg_matches(reg: str, lst: List[str]) -> List[str]:
 def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #load phecode file, already filtered down to icd10/phecodes
     pheno_data = pd.read_csv(args.phecode_source,sep="\t",dtype={args.pheno_col_phe:str})
-    map_data = pd.read_csv(args.map_source,sep="\t",dtype={args.pheno_col_map:str})
+    map_data = pd.read_csv(args.map_source,sep=",",dtype={args.pheno_col_map:str})
     pheno_data = pheno_data.fillna("")
     pheno_data = phenotype_data_filtering(pheno_data) #filter the data to only phecodes and icd10
     map_data = map_data.fillna("")
@@ -113,7 +113,7 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #output
     output_df = pd.DataFrame(output)
     output_df = pheno_data.merge(output_df, how="left", left_on=args.pheno_col_phe, right_on= "phenotype",sort=False)
-    output_df=output_df.drop(columns=["phenotype"])
+    output_df=output_df.drop(columns=["phenotype","icd10_map_col"])
     return output_df
 
 if __name__ == "__main__":
