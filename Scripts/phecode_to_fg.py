@@ -16,9 +16,7 @@ def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
     return df
 
 def fg_matches(reg: str, lst: List[str]) -> List[str]:
-    retlist= [a for a in lst if bool(re.match(reg,a))]
-    if not retlist:
-        return [reg]
+    retlist= [a for a in lst if bool(re.match(reg,a))] + [reg]
     return retlist
 
 def map_fg_for_phenotypes(args) -> pd.DataFrame:
@@ -34,8 +32,6 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     icd_id = "icd_all" #same as above
     phecode_data = pheno_data[pheno_data[args.phenotype_type_col] == phecode_id].copy()
     icd_data = pheno_data[pheno_data[args.phenotype_type_col] == icd_id].copy()
-    #for icd10, copy icd10 ,column to mapping column
-    icd_data["icd10_map_col"] = icd_data[args.pheno_col_phe].apply(lambda x:str(x).replace(".",""))
     #for phecodes, use phecode mapping to get matching list of phecodes
     #aggregate map data per phecode
     icd_codes_from_map=map_data.groupby(args.pheno_col_map).aggregate({args.icd_col_map:";".join}).reset_index() #colname from input data
@@ -47,6 +43,10 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
         sort=False
         )
     phecode_data = phecode_data.drop(columns=[args.pheno_col_map])
+    #for icd10, expand icd10 codes to mapping column
+    icd_codes = map_data[args.icd_col_map].unique()
+    icd_data["icd10_map_col"] = icd_data[args.pheno_col_phe].apply(lambda x:str(x).replace(".",""))
+    icd_data["icd10_map_col"] = icd_data["icd10_map_col"].apply(lambda x:";".join( fg_matches(x,icd_codes) ) )
     #concat those two DFs
     pheno_data = pd.concat([phecode_data,icd_data],sort=False).reset_index(drop=True)
     pheno_data = pheno_data.dropna(subset=["icd10_map_col"])
@@ -59,7 +59,6 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     fg_data[args.icd_col_fg] = fg_data[args.icd_col_fg].apply(lambda x: str(x).replace(".",""))
     #for each phenotype, get the closest fg match.
     print("Get ICD codes for FG...")
-    icd_codes = map_data[args.icd_col_map].unique()
     fg_data["matching_ICD"] = fg_data[args.icd_col_fg].apply(lambda x: ";".join(fg_matches(x,icd_codes)))
     fg_dict={}
     fg_regex_dict={}
