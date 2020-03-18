@@ -16,11 +16,10 @@ def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
     return df
 
 def fg_matches(reg: str, lst: List[str]) -> List[str]:
-    try:
-        return [a for a in lst if bool(re.match(reg,a))]
-    except:
-        print(reg, lst)
-        raise
+    retlist= [a for a in lst if bool(re.match(reg,a))]
+    if not retlist:
+        return [reg]
+    return retlist
 
 def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #load phecode file, already filtered down to icd10/phecodes
