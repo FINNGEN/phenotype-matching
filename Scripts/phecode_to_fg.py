@@ -19,6 +19,11 @@ def fg_matches(reg: str, lst: List[str]) -> List[str]:
     retlist= [a for a in lst if bool(re.match(reg,a))] + [reg]
     return retlist
 
+def fg_combine_regexes(x):
+    reg_lst = []
+    [reg_lst.append(tmp) for tmp in x if tmp not in reg_lst]
+    return "|".join(reg_lst)
+
 def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #load phecode file, already filtered down to icd10/phecodes
     pheno_data = pd.read_csv(args.phecode_source,sep="\t",dtype={args.pheno_col_phe:str})
@@ -54,18 +59,21 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #read in fg data
     fg_data = pd.read_csv(args.fg_source,sep="\t")
     #constrain fg to be only pheno name, icd10
-    fg_data = fg_data[[args.pheno_col_fg, args.icd_col_fg]]
-    fg_data = fg_data.dropna()
-    fg_data[args.icd_col_fg] = fg_data[args.icd_col_fg].apply(lambda x: str(x).replace(".",""))
+    fg_cols = [args.pheno_col_fg]+args.icd_col_fg
+    fg_data = fg_data[fg_cols]
+    fg_data = fg_data.dropna(how="all")
+    fg_data[args.icd_col_fg] = fg_data[args.icd_col_fg].applymap(lambda x: str(x).replace(".",""))
+    #create one joined FG ICD regex column
+    fg_data["fg_icd_regex"] = fg_data[args.icd_col_fg].apply(fg_combine_regexes,axis=1)
     #for each phenotype, get the closest fg match.
     print("Get ICD codes for FG...")
-    fg_data["matching_ICD"] = fg_data[args.icd_col_fg].apply(lambda x: ";".join(fg_matches(x,icd_codes)))
+    fg_data["matching_ICD"] = fg_data["fg_icd_regex"].apply(lambda x: ";".join(fg_matches(x,icd_codes)))
     fg_dict={}
     fg_regex_dict={}
     print("Create FG dict...")
     for t in fg_data.itertuples():
         fg_dict[getattr(t, args.pheno_col_fg)] = t.matching_ICD
-        fg_regex_dict[getattr(t, args.pheno_col_fg)] = getattr(t,args.icd_col_fg)
+        fg_regex_dict[getattr(t, args.pheno_col_fg)] = getattr(t,"fg_icd_regex")
     #first, get all fg matches for a single . Then, rank them according to similarity score.
     print("start to match PheCodes to FG...")
     output=[]
@@ -123,7 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("--pheno-col-fg",required=True,help="Phenotype column in FG file")
     parser.add_argument("--pheno-col-map",required=True,help="PheCode column in Phecode/ICD10 mapping")
     parser.add_argument("--icd-col-map",required=True,help="ICD10 column in Phe/ICD mapping")
-    parser.add_argument("--icd-col-fg",required=True,help="ICD10 column in FG file")
+    parser.add_argument("--icd-col-fg",required=True,nargs="+",help="ICD10 column in FG file")
     parser.add_argument("--phenotype-type-col",required=True,help="Phetype type column in PheCode/ICD10 file")
     parser.add_argument("--out",required=True, help="Output filename")
     args = parser.parse_args()
