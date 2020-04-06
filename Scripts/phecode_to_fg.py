@@ -33,11 +33,15 @@ def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
     df = df[df["data_type"].isin(["icd_all","phecode"])]
     return df
 
-def fg_matches(reg: str, lst: List[str]) -> List[str]:
+def get_matches(reg: str, lst: List[str]) -> List[str]:
+    """Match list of strings to regex, returning those strings that match the regex.
+    """
     retlist= [a for a in lst if bool(re.match(reg,a))] + [reg]
     return retlist
 
 def fg_combine_regexes(x: List[str]) -> str:
+    """Combine regex expressions (with OR, not AND) into one regex.
+    """
     reg_lst = []
     [reg_lst.append(tmp) for tmp in x if ((tmp not in reg_lst) and (tmp != ""))]
     return "|".join(reg_lst)
@@ -75,7 +79,7 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #for icd10, expand icd10 codes to mapping column
     icd_codes = map_data[args.icd_col_map].unique()
     icd_data["icd10_map_col"] = icd_data[args.pheno_col_phe].apply(lambda x:str(x).replace(".",""))
-    icd_data["icd10_map_col"] = icd_data["icd10_map_col"].apply(lambda x:";".join( fg_matches(x,icd_codes) ) )
+    icd_data["icd10_map_col"] = icd_data["icd10_map_col"].apply(lambda x:";".join( get_matches(x,icd_codes) ) )
     #concat those two DFs
     pheno_data = pd.concat([phecode_data,icd_data],sort=False).reset_index(drop=True)
     pheno_data = pheno_data.dropna(subset=["icd10_map_col"])
@@ -106,7 +110,7 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
             fg_data.loc[getattr(t,"Index"),fg_regex_with_includes_colname] = "EXCEPTION! INVALID PHENONAMES IN {} COLUMN".format(args.include_col_fg)
     #for each phenotype, get the closest fg match.
     print("Get ICD codes for FG...")
-    fg_data["matching_ICD"] = fg_data[fg_regex_with_includes_colname].apply(lambda x: ";".join(fg_matches(x,icd_codes)) if pd.notna(x) and x!="" else "NAN")
+    fg_data["matching_ICD"] = fg_data[fg_regex_with_includes_colname].apply(lambda x: ";".join(get_matches(x,icd_codes)) if pd.notna(x) and x!="" else "NAN")
     fg_data.to_csv("fg_data_df.tsv",sep="\t",index=False)
     fg_dict={}
     fg_regex_dict={}
@@ -178,4 +182,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     output=map_fg_for_phenotypes(args)
     output.to_csv(args.out,sep="\t",index=False)
-
