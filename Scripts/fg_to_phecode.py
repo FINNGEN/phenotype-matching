@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import argparse
 import pandas as pd, numpy as np
 from expand_codes import *
@@ -15,8 +15,8 @@ def main(args):
     """Find matching PheCodes for FinnGen phenotypes
     """
     #load files into dataframes etc
-    source_1 = pd.read_csv(args.source1, sep="\t",dtype=str)
-    source_2 = pd.read_csv(args.source2, sep="\t",dtype=str)
+    source_1 = pd.read_csv(args.source1, sep=args.source1_sep,dtype=str)
+    source_2 = pd.read_csv(args.source2, sep=args.source2_sep,dtype=str)
     #restrict to relevant columns
     df_1 = source_1[[args.pheno_col_1,args.icd_col_1]].copy()
     df_1=df_1.dropna()
@@ -79,7 +79,9 @@ def main(args):
 if __name__ == "__main__":
     parser=argparse.ArgumentParser("Map phenotypes using ICD-10 as intermediary")
     parser.add_argument("--source1",required=True,help="Phenotype source 1")
+    parser.add_argument("--source1_sep", default="\t", help="Phenotype source 2")
     parser.add_argument("--source2",required=True,help="Phenotype source 2")
+    parser.add_argument("--source2_sep", default=",", help="Phenotype source 2")
     parser.add_argument("--pheno-col-1",required=True,help="Phenotype column in source 1")
     parser.add_argument("--pheno-col-2",required=True,help="Phenotype column in source 2")
     parser.add_argument("--icd-col-1",required=True,help="ICD10 column in source 1")
