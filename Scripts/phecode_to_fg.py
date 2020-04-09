@@ -9,7 +9,10 @@ from tree import *
 def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str, rec: bool=False, nodeset: Optional[AbstractSet]=None) -> Tree :
     """Build a tree from the include dependency chains, removing any cycles if necessary.
     """
-    row = fg_df[fg_df[pheno_colname] == pheno ].iloc[0]
+    try:
+        row = fg_df[fg_df[pheno_colname] == pheno ].iloc[0]
+    except:
+        return
     node_data = row[icd_colname]
     if not rec:
         nodeset=set()
@@ -20,7 +23,11 @@ def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, i
     for c in row[include_colname].split("|"):
         if c not in nodeset:
             subnode = build_dependency_tree(fg_df,c,pheno_colname,icd_colname,include_colname,True,nodeset)
-            subtree.add_child(subnode)
+            if subnode != None:
+                subtree.add_child(subnode)
+            else:
+                print("Warning: phenotype {} has included phenotype {} that does not exist.".format(pheno,c))
+
     return subtree
 
 
@@ -97,17 +104,14 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     fg_regex_code_store={} #pheno:icd-codes
     fg_regex_with_includes_colname = "fg_regex_with_includes"
     fg_data[fg_regex_with_includes_colname]=np.nan
-    print("Fix FG Includes")
+    print("Add ICD10s for FG Includes...")
     #first, remove those that have no includes. makes for much smaller amount of work.
     #separate those that have no includes
     no_includes = pd.isna(fg_data[args.include_col_fg])
     includes = ~pd.isna(fg_data[args.include_col_fg])
     fg_data.loc[no_includes,fg_regex_with_includes_colname] = fg_data.loc[no_includes,"fg_icd_regex"]
     for t in fg_data.loc[includes,:].itertuples():
-        try:
-            fg_data.loc[getattr(t,"Index"),fg_regex_with_includes_colname] = solve_includes(fg_data,getattr(t,args.pheno_col_fg),args.pheno_col_fg,"fg_icd_regex",args.include_col_fg)
-        except:
-            fg_data.loc[getattr(t,"Index"),fg_regex_with_includes_colname] = "EXCEPTION! INVALID PHENONAMES IN {} COLUMN".format(args.include_col_fg)
+        fg_data.loc[getattr(t,"Index"),fg_regex_with_includes_colname] = solve_includes(fg_data,getattr(t,args.pheno_col_fg),args.pheno_col_fg,"fg_icd_regex",args.include_col_fg)
     #for each phenotype, get the closest fg match.
     print("Get ICD codes for FG...")
     fg_data["matching_ICD"] = fg_data[fg_regex_with_includes_colname].apply(lambda x: ";".join(get_matches(x,icd_codes)) if pd.notna(x) and x!="" else "NAN")
