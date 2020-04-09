@@ -30,7 +30,7 @@ pip3 install pandas numpy
 
 Map FG endpoints to UKBB endpoints (each row contains UKBB/PheCode endpoint, and has the best matching FG endpoint on a column):
 ```
-python3 Scripts/phecode_to_fg.py --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-col-phe pheno --pheno-col-fg NAME --pheno-col-map PHECODE --icd-col-map ICD10 --icd-col-fg HD_ICD_10 --phenotype-type-col data_type --out OUTPUT_FILE.tsv
+python3 Scripts/phecode_to_fg.py --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-col-phe pheno --pheno-col-fg NAME --pheno-col-map PHECODE --include-col-fg INCLUDE --icd-col-map ICD10 --icd-col-fg HD_ICD_10 --phenotype-type-col data_type --out OUTPUT_FILE.tsv
 ```
 
 Map UKBB endpoints to FG endpoints (each row contains one FG endpoint, and has the best matching UKBB endpoint on a column):
