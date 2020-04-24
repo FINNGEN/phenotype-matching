@@ -14,17 +14,20 @@ FG_MATCHING_ICD="matching_icd"
 ICD_MAP_COL="icd_map_col"
 
 def clean_map_data(map_data: pd.DataFrame, map_icd_col: str) -> pd.DataFrame:
+    """Clean up map data
+    """
     map_data = map_data.fillna("")
     map_data[map_icd_col] =map_data[map_icd_col].apply(lambda x: str(x).replace(".",""))
     return map_data
 
-def get_icd_codes(map_data,icd_column) -> List[str]:
+def get_icd_codes(map_data: pd.DataFrame, icd_column: str) -> List[str]:
     """Get List if ICD codes from ICD code map
     """
     return map_data[icd_column].unique()
 
 def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno_pheno_col: str, pheno_type_col: str, map_pheno_col: str, map_icd_col: str) -> pd.DataFrame:
-
+    """Data preprocessing for phecode data
+    """
     # icd10 and phecode phenotype codes
     phecode_id = "phecode"
     icd_id = "icd_all"
@@ -51,7 +54,8 @@ def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno
     return pheno_data
 
 def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: str, fg_pheno_col: str) -> pd.DataFrame:
-    
+    """Data preprocessing for FinnGen data
+    """
     fg_cols = [fg_pheno_col, fg_inc_col]+fg_icd_col
     fg_data=fg_data[fg_cols]
     fg_data=fg_data.dropna(how="all")
@@ -74,7 +78,9 @@ def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: st
 
     return fg_data
 
-def join_data(phecode_data,fg_data,icd_codes,join_direction,fg_pheno_col, pheno_pheno_col) -> pd.DataFrame:
+def join_data(phecode_data: pd.DataFrame, fg_data: pd.DataFrame, icd_codes: List[str], join_direction: str, fg_pheno_col: str, pheno_pheno_col: str) -> pd.DataFrame:
+    """Calculate most similar endpoint and join the phenotype data
+    """
     #if join direction is to phecode table -> find best FG phenotype for that
     if join_direction == "phecode":
         ##add icd codes for fg
@@ -161,7 +167,7 @@ def join_data(phecode_data,fg_data,icd_codes,join_direction,fg_pheno_col, pheno_
             record["phecode_icd10"] = best_matches
             record["best_phecode_score"] = best_score
             record["all_phenos"] = listed_phenos
-            record["phecode"] = best_reg
+            record["phecode"] = best_pheno
             output_records.append(record)
         output_df=pd.DataFrame(output_records)
         output_df = fg_data.merge(output_df,how="left",left_on=fg_pheno_col,right_on="fg_phenotype",sort=False)
