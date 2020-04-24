@@ -75,8 +75,8 @@ def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: st
     return fg_data
 
 def join_data(phecode_data,fg_data,icd_codes,join_direction,fg_pheno_col, pheno_pheno_col) -> pd.DataFrame:
-    #if join direction is right
-    if join_direction == "left":
+    #if join direction is to phecode table -> find best FG phenotype for that
+    if join_direction == "phecode":
         ##add icd codes for fg
         fg_data[FG_MATCHING_ICD] = fg_data[FG_REGEX_COL].apply(lambda x:";".join(get_matches(x,icd_codes)) if pd.notna(x) and x!="" else "NAN")
         ##create fg dicts
@@ -123,11 +123,53 @@ def join_data(phecode_data,fg_data,icd_codes,join_direction,fg_pheno_col, pheno_
         output_df = output_df.drop(columns=["phenotype",ICD_MAP_COL])
         return output_df
 
-    #if join directions is left
-    elif join_direction =="right":
-        raise NotImplementedError("Joining of data in left direction not yet implemented!")
+    #if join directions is to finngen table -> find best Phecode for every FG pheno
+    elif join_direction =="finngen":
+        fg_data[FG_MATCHING_ICD] = fg_data[FG_REGEX_COL].apply(lambda x:";".join(get_matches(x,icd_codes)) if pd.notna(x) and x!="" else "NAN")
+        phecode_dict={}
+        phecode_value={}
+        for t in phecode_data.itertuples():
+            phecode_dict[getattr(t,pheno_pheno_col)] = getattr(t, ICD_MAP_COL)
+            phecode_value[getattr(t,pheno_pheno_col)] = getattr(t,ICD_MAP_COL)
+        output_records: List[Dict[str,Any]]=[]
+        for t in fg_data.itertuples():
+            record={}
+            record["fg_phenotype"] = getattr(t,fg_pheno_col)
+            record["fg_icd_matches"] = getattr(t,FG_MATCHING_ICD)
+            icd_matches = set(getattr(t,FG_MATCHING_ICD).split(";"))
+            ph_match_list = []
+            ph_score_list = []
+            for phenoname, icds in phecode_dict.items():
+                similarity_score=union_similarity(icd_matches,icds.split(";"))
+                if similarity_score > 0:
+                    ph_match_list.append(phenoname)
+                    ph_score_list.append(similarity_score)
+            if len(ph_score_list) > 0:
+                best_score_idx = np.argmax(ph_score_list)
+                best_score = ph_score_list[best_score_idx]
+                best_pheno = ph_match_list[best_score_idx]
+                best_matches = phecode_dict[best_pheno]
+                best_reg = phecode_value[best_pheno]
+                listed_phenos=";".join( "{}|{:.3g}".format(a,b) for (a,b) in itertools.zip_longest(ph_match_list,ph_score_list ) )
+            else:
+                best_pheno="NA"
+                best_score="NA"
+                listed_phenos="NA"
+                best_matches = "NA"
+                best_reg = "NA"
+            record["best_phecode_phenotype"] = best_pheno
+            record["phecode_icd10"] = best_matches
+            record["best_phecode_score"] = best_score
+            record["all_phenos"] = listed_phenos
+            record["phecode"] = best_reg
+            output_records.append(record)
+        output_df=pd.DataFrame(output_records)
+        output_df = fg_data.merge(output_df,how="left",left_on=fg_pheno_col,right_on="fg_phenotype",sort=False)
+        output_df = output_df.drop(columns=["fg_phenotype",FG_MATCHING_ICD])
+        return output_df
     else:
-        raise NotImplementedError("Joining in other direction than right or left not implemented!!")
+        raise NotImplementedError("Invalid join argument")
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser("Map FG and UKBB/ICD10 codes to each other, either left or right join")
     parser.add_argument("--main-table",required=True, choices=["phecode","finngen"],help="The direction of the join goes from auxiliary data to main table. So 'phecode' would map FG endpoints to the phecode data.")
@@ -144,12 +186,12 @@ if __name__ == "__main__":
     fg_parser = parser.add_argument_group("finngen")
     fg_parser.add_argument("--fg-source",required=True,help="FinnGen file")
     fg_parser.add_argument("--fg-pheno-col",required=True,help="Phenotype column in FG file")
-    fg_parser.add_argument("--fg-icd-col",required=True,nargs="+",help="ICD10 column in FG file")
+    fg_parser.add_argument("--fg-icd-col",required=True,nargs="+",help="ICD10 columns in FG file")
     fg_parser.add_argument("--fg-inc-col",required=True,help="The column which lists the FG endpoints included in an endpoint")
 
     args=parser.parse_args()
 
-    join_direction = "left" if args.main_table == "phecode"  else "right"
+    join_direction = args.main_table
 
     print("Load data...",end="\r")
     pheno_data_ = pd.read_csv(args.phecode_source, sep = '\t')
