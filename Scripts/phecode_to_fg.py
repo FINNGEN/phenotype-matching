@@ -1,10 +1,35 @@
 #! /usr/bin/env python3
-
 import pandas as pd, numpy as np
 from fg_to_phecode import *
 import argparse, re
-from typing import AbstractSet, List, Dict
+from typing import AbstractSet, List, Dict, Optional
 import itertools
+from tree import *
+
+def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str, rec: bool=False, nodeset: Optional[AbstractSet]=None) -> Tree :
+    """Build a tree from the include dependency chains, removing any cycles if necessary.
+    """
+    try:
+        row = fg_df[fg_df[pheno_colname] == pheno ].iloc[0]
+    except:
+        return
+    node_data = row[icd_colname]
+    if not rec:
+        nodeset=set()
+    nodeset.add(pheno)
+    subtree = Tree(pheno, node_data)
+    if pd.isna(row[include_colname]):
+        return subtree
+    for c in row[include_colname].split("|"):
+        if c not in nodeset:
+            subnode = build_dependency_tree(fg_df,c,pheno_colname,icd_colname,include_colname,True,nodeset)
+            if subnode != None:
+                subtree.add_child(subnode)
+            else:
+                print("Warning: phenotype {} has included phenotype {} that does not exist.".format(pheno,c))
+
+    return subtree
+
 
 def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
     #filter the input data so it only contains ice10s and phecodes
@@ -15,9 +40,24 @@ def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
     df = df[df["data_type"].isin(["icd_all","phecode"])]
     return df
 
-def fg_matches(reg: str, lst: List[str]) -> List[str]:
+def get_matches(reg: str, lst: List[str]) -> List[str]:
+    """Match list of strings to regex, returning those strings that match the regex.
+    """
     retlist= [a for a in lst if bool(re.match(reg,a))] + [reg]
     return retlist
+
+def fg_combine_regexes(x: List[str]) -> str:
+    """Combine regex expressions (with OR, not AND) into one regex.
+    """
+    reg_lst = []
+    [reg_lst.append(tmp) for tmp in x if ((tmp not in reg_lst) and (tmp != ""))]
+    return "|".join(reg_lst)
+
+def solve_includes(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str) -> str:
+    """Solve regex column when multiple endpoints are included in endpoint. Handles cyclical cases. Does not handle missing phenotype names.
+    """
+    icds = "|".join(a for a in get_tree_nodes( build_dependency_tree(fg_df,pheno,pheno_colname,icd_colname,include_colname)).values() if a != "")
+    return icds
 
 def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #load phecode file, already filtered down to icd10/phecodes
@@ -46,7 +86,7 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #for icd10, expand icd10 codes to mapping column
     icd_codes = map_data[args.icd_col_map].unique()
     icd_data["icd10_map_col"] = icd_data[args.pheno_col_phe].apply(lambda x:str(x).replace(".",""))
-    icd_data["icd10_map_col"] = icd_data["icd10_map_col"].apply(lambda x:";".join( fg_matches(x,icd_codes) ) )
+    icd_data["icd10_map_col"] = icd_data["icd10_map_col"].apply(lambda x:";".join( get_matches(x,icd_codes) ) )
     #concat those two DFs
     pheno_data = pd.concat([phecode_data,icd_data],sort=False).reset_index(drop=True)
     pheno_data = pheno_data.dropna(subset=["icd10_map_col"])
@@ -54,18 +94,34 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #read in fg data
     fg_data = pd.read_csv(args.fg_source,sep="\t")
     #constrain fg to be only pheno name, icd10
-    fg_data = fg_data[[args.pheno_col_fg, args.icd_col_fg]]
-    fg_data = fg_data.dropna()
-    fg_data[args.icd_col_fg] = fg_data[args.icd_col_fg].apply(lambda x: str(x).replace(".",""))
+    fg_cols = [args.pheno_col_fg,args.include_col_fg]+args.icd_col_fg
+    fg_data = fg_data[fg_cols]
+    fg_data = fg_data.dropna(how="all")
+    fg_data[args.icd_col_fg] = fg_data[args.icd_col_fg].applymap(lambda x: str(x).replace(".","") if pd.notna(x) else "")
+    #create one joined FG ICD regex column
+    fg_data["fg_icd_regex"] = fg_data[args.icd_col_fg].apply(fg_combine_regexes,axis=1)
+    #add the include phenotypes ICD-codes to those that have them
+    fg_regex_code_store={} #pheno:icd-codes
+    fg_regex_with_includes_colname = "fg_regex_with_includes"
+    fg_data[fg_regex_with_includes_colname]=np.nan
+    print("Add ICD10s for FG Includes...")
+    #first, remove those that have no includes. makes for much smaller amount of work.
+    #separate those that have no includes
+    no_includes = pd.isna(fg_data[args.include_col_fg])
+    includes = ~pd.isna(fg_data[args.include_col_fg])
+    fg_data.loc[no_includes,fg_regex_with_includes_colname] = fg_data.loc[no_includes,"fg_icd_regex"]
+    for t in fg_data.loc[includes,:].itertuples():
+        fg_data.loc[getattr(t,"Index"),fg_regex_with_includes_colname] = solve_includes(fg_data,getattr(t,args.pheno_col_fg),args.pheno_col_fg,"fg_icd_regex",args.include_col_fg)
     #for each phenotype, get the closest fg match.
     print("Get ICD codes for FG...")
-    fg_data["matching_ICD"] = fg_data[args.icd_col_fg].apply(lambda x: ";".join(fg_matches(x,icd_codes)))
+    fg_data["matching_ICD"] = fg_data[fg_regex_with_includes_colname].apply(lambda x: ";".join(get_matches(x,icd_codes)) if pd.notna(x) and x!="" else "NAN")
+    fg_data.to_csv("fg_data_df.tsv",sep="\t",index=False)
     fg_dict={}
     fg_regex_dict={}
     print("Create FG dict...")
     for t in fg_data.itertuples():
         fg_dict[getattr(t, args.pheno_col_fg)] = t.matching_ICD
-        fg_regex_dict[getattr(t, args.pheno_col_fg)] = getattr(t,args.icd_col_fg)
+        fg_regex_dict[getattr(t, args.pheno_col_fg)] = getattr(t,fg_regex_with_includes_colname)
     #first, get all fg matches for a single . Then, rank them according to similarity score.
     print("start to match PheCodes to FG...")
     output=[]
@@ -123,10 +179,10 @@ if __name__ == "__main__":
     parser.add_argument("--pheno-col-fg",required=True,help="Phenotype column in FG file")
     parser.add_argument("--pheno-col-map",required=True,help="PheCode column in Phecode/ICD10 mapping")
     parser.add_argument("--icd-col-map",required=True,help="ICD10 column in Phe/ICD mapping")
-    parser.add_argument("--icd-col-fg",required=True,help="ICD10 column in FG file")
+    parser.add_argument("--icd-col-fg",required=True,nargs="+",help="ICD10 column in FG file")
     parser.add_argument("--phenotype-type-col",required=True,help="Phetype type column in PheCode/ICD10 file")
+    parser.add_argument("--include-col-fg",required=True,help="The column which lists the FG endpoints included in an endpoint")
     parser.add_argument("--out",required=True, help="Output filename")
     args = parser.parse_args()
     output=map_fg_for_phenotypes(args)
     output.to_csv(args.out,sep="\t",index=False)
-
