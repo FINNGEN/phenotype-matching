@@ -50,7 +50,7 @@ def fg_combine_regexes(x: List[str]) -> str:
     """Combine regex expressions (with OR, not AND) into one regex.
     """
     reg_lst = []
-    [reg_lst.append(tmp) for tmp in x if ((tmp not in reg_lst) and (tmp != ""))]
+    [reg_lst.append(tmp) for tmp in x if (((tmp not in reg_lst) and (tmp != "") )and (tmp != "$!$"))]
     return "|".join(reg_lst)
 
 def solve_includes(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str) -> str:
