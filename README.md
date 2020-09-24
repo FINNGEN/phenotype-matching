@@ -38,5 +38,5 @@ Map UKBB endpoints to FG endpoints (each row contains one FG endpoint, and has t
 python3 Scripts/fg_to_phecode.py --source1 data/finngen_R4_endpoints_utf8.tsv --source2 data/phecode_map_icd10.tsv --pheno-col-1 NAME --pheno-col-2 PHECODE --icd-col-1 HD_ICD_10 --icd-col-2 ICD10 --out OUTPUT_FILE.tsv
 ```
 ## Acknowledgements
-Tuomo Kiiskinen for the original matching algorithm
+Tuomo Kiiskinen for the original matching algorithm  
 Aki Havulinna & Tuomo Kiiskinen, clinical expert groups & others at FIMM & THL for the FinnGen phenotype definitions
