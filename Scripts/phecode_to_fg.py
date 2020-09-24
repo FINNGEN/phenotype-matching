@@ -1,4 +1,5 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
+
 import pandas as pd, numpy as np
 from fg_to_phecode import *
 import argparse, re
@@ -33,10 +34,10 @@ def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, i
 
 def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
     #filter the input data so it only contains ice10s and phecodes
-    df= df.loc[df["n_cases_both_sexes"]>100,:]     
-    df= df[df["coding"]!="icd9"]  
-    df= df[~df["pheno"].isin(['22601', '22617', '20024', '41230', '41210'])]   
-    df= df[df["pop"]=="EUR"] 
+    df= df.loc[df["n_cases_both_sexes"]>100,:]
+    df= df[df["coding"]!="icd9"]
+    df= df[~df["pheno"].isin(['22601', '22617', '20024', '41230', '41210'])]
+    df= df[df["pop"]=="EUR"]
     df = df[df["data_type"].isin(["icd_all","phecode"])]
     return df
 
@@ -61,12 +62,12 @@ def solve_includes(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_coln
 
 def map_fg_for_phenotypes(args) -> pd.DataFrame:
     #load phecode file, already filtered down to icd10/phecodes
-    pheno_data = pd.read_csv(args.phecode_source,sep="\t",dtype={args.pheno_col_phe:str})
-    map_data = pd.read_csv(args.map_source,sep=",",dtype={args.pheno_col_map:str})
+    pheno_data = pd.read_csv(args.phecode_source,sep=args.phecode_source_sep,dtype={args.pheno_col_phe:str})
+    map_data = pd.read_csv(args.map_source,sep=args.map_source_sep,dtype={args.pheno_col_map:str})
     pheno_data = pheno_data.fillna("")
     pheno_data = phenotype_data_filtering(pheno_data) #filter the data to only phecodes and icd10
     map_data = map_data.fillna("")
-    map_data[args.icd_col_map] =map_data[args.icd_col_map].apply(lambda x: str(x).replace(".","")) 
+    map_data[args.icd_col_map] =map_data[args.icd_col_map].apply(lambda x: str(x).replace(".",""))
     #divide dataset into phecodes and icd10s
     phecode_id = "phecode" #from datafile, exomes_full_run etc
     icd_id = "icd_all" #same as above
@@ -153,14 +154,14 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
             listed_phenos="NA"
             best_matches = "NA"
             best_reg = "NA"
-        
+
         record["best_fg_phenotype"] = best_pheno
         record["fg_icd10"] = best_matches
         record["best_fg_score"] = best_score
         record["all_phenos"] = listed_phenos
         record["fg_regex"] = best_reg
         output.append(record)
-        
+
         if i % (am_rows//10) == 0:
             print("Progress: {:3.1f}%".format(i/am_rows*100))
         i+=1
@@ -173,8 +174,11 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
 if __name__ == "__main__":
     parser=argparse.ArgumentParser("Map Phecodes/ICD10 to Finngen (best FG phenotype for each ICD10/PheCode) using ICD10 as intermediary")
     parser.add_argument("--phecode-source",required=True,help="Phecode/ICD10 file")
+    parser.add_argument("--phecode-source-sep",default="\t",help="Phecode/ICD10 file separator")
     parser.add_argument("--fg-source",required=True,help="FinnGen file")
+    parser.add_argument("--fg-source-sep",default="\t",help="FinnGen file separator")
     parser.add_argument("--map-source",required=True,help="Phecode/ICD10 mapping file")
+    parser.add_argument("--map-source-sep", default=",", help="Phecode/ICD10 mapping file separator")
     parser.add_argument("--pheno-col-phe",required=True,help="Phenotype column in phecode/ICD10 file")
     parser.add_argument("--pheno-col-fg",required=True,help="Phenotype column in FG file")
     parser.add_argument("--pheno-col-map",required=True,help="PheCode column in Phecode/ICD10 mapping")
