@@ -117,10 +117,11 @@ def map_fg_for_phenotypes(args) -> pd.DataFrame:
 if __name__ == "__main__":
     parser=argparse.ArgumentParser("Map Phecodes/ICD10 to Finngen (best FG phenotype for each ICD10/PheCode) using ICD10 as intermediary")
     parser.add_argument("--phecode-source",required=True,help="Phecode/ICD10 file")
+    parser.add_argument("--phecode-source-sep",default="\t",help="Phecode/ICD10 file separator")
     parser.add_argument("--fg-source",required=True,help="FinnGen file")
-    parser.add_argument("--fg-source_sep",default="\t",help="FinnGen file")
+    parser.add_argument("--fg-source-sep",default="\t",help="FinnGen file separator")
     parser.add_argument("--map-source",required=True,help="Phecode/ICD10 mapping file")
-    parser.add_argument("--map_source_sep", default=",", help="Phenotype source 2")
+    parser.add_argument("--map-source-sep", default=",", help="Phecode/ICD10 mapping file separator")
     parser.add_argument("--pheno-col-phe",required=True,help="Phenotype column in phecode/ICD10 file")
     parser.add_argument("--pheno-col-fg",required=True,help="Phenotype column in FG file")
     parser.add_argument("--pheno-col-map",required=True,help="PheCode column in Phecode/ICD10 mapping")
