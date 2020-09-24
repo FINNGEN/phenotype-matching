@@ -79,9 +79,9 @@ def main(args):
 if __name__ == "__main__":
     parser=argparse.ArgumentParser("Map phenotypes using ICD-10 as intermediary")
     parser.add_argument("--source1",required=True,help="Phenotype source 1")
-    parser.add_argument("--source1_sep", default="\t", help="Phenotype source 2")
+    parser.add_argument("--source1-sep", default="\t", help="Phenotype source 1 separator")
     parser.add_argument("--source2",required=True,help="Phenotype source 2")
-    parser.add_argument("--source2_sep", default=",", help="Phenotype source 2")
+    parser.add_argument("--source2_sep", default=",", help="Phenotype source 2 separator")
     parser.add_argument("--pheno-col-1",required=True,help="Phenotype column in source 1")
     parser.add_argument("--pheno-col-2",required=True,help="Phenotype column in source 2")
     parser.add_argument("--icd-col-1",required=True,help="ICD10 column in source 1")
