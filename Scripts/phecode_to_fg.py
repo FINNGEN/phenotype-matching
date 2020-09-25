@@ -32,19 +32,12 @@ def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, i
     return subtree
 
 
-def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
-    #filter the input data so it only contains ice10s and phecodes
-    df= df.loc[df["n_cases_both_sexes"]>100,:]
-    df= df[df["coding"]!="icd9"]
-    df= df[~df["pheno"].isin(['22601', '22617', '20024', '41230', '41210'])]
-    df= df[df["pop"]=="EUR"]
-    df = df[df["data_type"].isin(["icd_all","phecode"])]
-    return df
-
 def get_matches(reg: str, lst: List[str]) -> List[str]:
     """Match list of strings to regex, returning those strings that match the regex.
     """
-    retlist= [a for a in lst if bool(re.match(reg,a))] + [reg]
+    retlist= [a for a in lst if bool(re.match(reg,a))]
+    if not retlist:
+        retlist=[reg] #in case the reg did not match any strings, it itself is a valid non-matching string. 'NA' would match with other 'NA'
     return retlist
 
 def fg_combine_regexes(x: List[str]) -> str:

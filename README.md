@@ -18,6 +18,17 @@ Phecode-ICD10 mapping file: https://phewascatalog.org/phecodes_icd10
 FG endpoints: http://results.finngen.fi/static/FINNGEN_ENDPOINTS_DF4_V2.zip (needs to be converted to utf-8 if redonwloaded)  
 UKBB endpoint listing: ??  
 
+## Input data
+
+### Phecode/ICD10 endpoints
+The file should contain a column for the Phecode/ICD10 code, and a column for its type, which can be either 'phecode' or 'icd10'. The user is responsible for filtering and transforming the input data.
+
+### Phecode<->ICD10 mapping file
+The file should be a many-to-many mapping for ICD10<->Phecode endpoints, with one mapping per line. The file should have a column for the phecodes, as well as one for the icd10s.
+
+### FinnGen endpoint file
+The file should be the same as the finngen endpoint definitions.
+
 ## Installation
 
 Requires python 3 with packages `numpy` and `pandas`
@@ -29,16 +40,15 @@ pip3 install pandas numpy
 ```
 
 ## Usage
-
 Map FG endpoints to UKBB endpoints (each row contains UKBB/PheCode endpoint, and has the best matching FG endpoint on a column):
 ```
 Scripts/phenomatch.py --main-table phecode --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-pheno-col pheno --fg-pheno-col NAME --map-pheno-col PHECODE --fg-inc-col INCLUDE --map-icd-col ICD10 --fg-icd-col HD_ICD_10 --pheno-type-col data_type --out OUTPUT_FILE.tsv
 ```
-
 Map UKBB endpoints to FG endpoints (each row contains one FG endpoint, and has the best matching UKBB endpoint on a column):
 ```
 Scripts/phenomatch.py --main-table finngen --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-pheno-col pheno --fg-pheno-col NAME --map-pheno-col PHECODE --fg-inc-col INCLUDE --map-icd-col ICD10 --fg-icd-col HD_ICD_10 --pheno-type-col data_type --out OUTPUT_FILE.tsv
 ```
+
 ## Acknowledgements
 Tuomo Kiiskinen for the original matching algorithm  
 Aki Havulinna & Tuomo Kiiskinen, clinical expert groups & others at FIMM & THL for the FinnGen phenotype definitions

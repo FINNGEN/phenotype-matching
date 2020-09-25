@@ -2,16 +2,32 @@
 
 import pandas as pd, numpy as np #typing: ignore
 import argparse, re
-from typing import AbstractSet, List, Dict, Optional
+from typing import AbstractSet, List, Dict, Optional, NamedTuple
 import itertools
 from tree import * 
-from phecode_to_fg import phenotype_data_filtering, get_matches, fg_combine_regexes, solve_includes #typing: ignore
+from phecode_to_fg import get_matches, fg_combine_regexes, solve_includes #typing: ignore
 from fg_to_phecode import union_similarity
 
 #constants
 FG_REGEX_COL="fg_regex_column"
 FG_MATCHING_ICD="matching_icd"
 ICD_MAP_COL="icd_map_col"
+
+"""
+TODO the phenotype data should be filtered before the script. DONE-ish
+TODO remove duplicates from the phecode codes so they are formatted correctly in the outputs DONE-ish
+TODO separate actual joining from data preprocessing, there's an awful lot of data preprocessing done there. The actual joining is done over dicts: Why are dataframes passed to the function?
+    Reimplement the joining based on the needs of the calculation, and then figure out a way to transform and clean the data into that format. 
+"""
+
+def phenotype_data_filtering(df: pd.DataFrame) -> pd.DataFrame :
+    #filter the input data so it only contains ice10s and phecodes
+    df= df.loc[df["n_cases_both_sexes"]>100,:]
+    df= df[df["coding"]!="icd9"]
+    df= df[~df["pheno"].isin(['22601', '22617', '20024', '41230', '41210'])]
+    df= df[df["pop"]=="EUR"]
+    df = df[df["data_type"].isin(["icd_all","phecode"])]
+    return df
 
 def clean_map_data(map_data: pd.DataFrame, map_icd_col: str) -> pd.DataFrame:
     """Clean up map data
@@ -30,7 +46,7 @@ def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno
     """
     # icd10 and phecode phenotype codes
     phecode_id = "phecode"
-    icd_id = "icd_all"
+    icd_id = "icd10"
 
     #separate icd10 and phecode entries in pheno_data
     phecode_data = pheno_data[pheno_data[pheno_type_col] == phecode_id].copy()
@@ -46,7 +62,7 @@ def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno
     phecode_data = phecode_data.drop(columns=[map_pheno_col])
     icd_codes = get_icd_codes(map_data,map_icd_col)
     icd_data[ICD_MAP_COL] = icd_data[pheno_pheno_col].apply(lambda x:str(x).replace(".",""))
-    icd_data[ICD_MAP_COL] = icd_data[ICD_MAP_COL].apply(lambda x:";".join( get_matches(x,icd_codes) ) )
+    icd_data[ICD_MAP_COL] = icd_data[ICD_MAP_COL].apply(lambda x:";".join( list(set(get_matches(x,icd_codes))) ) )
     
     pheno_data = pd.concat([phecode_data,icd_data],sort=False).reset_index(drop=True)
     pheno_data = pheno_data.fillna("")
@@ -174,21 +190,23 @@ def join_data(phecode_data: pd.DataFrame, fg_data: pd.DataFrame, icd_codes: List
         output_df = output_df.drop(columns=["fg_phenotype",FG_MATCHING_ICD])
         return output_df
     else:
-        raise NotImplementedError("Invalid join argument")
+        raise Exception("Invalid join argument")
 
 if __name__ == "__main__":
     parser=argparse.ArgumentParser("Map FG and UKBB/ICD10 codes to each other, either left or right join")
     parser.add_argument("--main-table",required=True, choices=["phecode","finngen"],help="The direction of the join goes from auxiliary data to main table. So 'phecode' would map FG endpoints to the phecode data.")
     parser.add_argument("--out",required=True, help="Output filename")
-
+    #Phecode data
     phecode_parser = parser.add_argument_group("phecode")
-    phecode_parser.add_argument("--phecode-source",required=True,help="Phecode/ICD10 file")
+    phecode_parser.add_argument("--phecode-source",required=True,help="Phecode/ICD10 file with phenotypes that are to be matched with FG data")
     phecode_parser.add_argument("--pheno-pheno-col",required=True,help="Phenotype column in phecode/ICD10 file")
     phecode_parser.add_argument("--pheno-type-col",required=True,help="Phenotype type column in PheCode/ICD10 file")
-    phecode_parser.add_argument("--map-source",required=True,help="Phecode/ICD10 mapping file")
-    phecode_parser.add_argument("--map-pheno-col",required=True,help="PheCode column in Phecode/ICD10 mapping")
-    phecode_parser.add_argument("--map-icd-col",required=True,help="ICD10 column in Phe/ICD mapping")
-
+    #Mapping data
+    mapping_parser = parser.add_argument_group("mapping")
+    mapping_parser.add_argument("--map-source",required=True,help="Phecode/ICD10 mapping file")
+    mapping_parser.add_argument("--map-pheno-col",required=True,help="PheCode column in Phecode/ICD10 mapping")
+    mapping_parser.add_argument("--map-icd-col",required=True,help="ICD10 column in Phe/ICD mapping")
+    #FinnGen data
     fg_parser = parser.add_argument_group("finngen")
     fg_parser.add_argument("--fg-source",required=True,help="FinnGen file")
     fg_parser.add_argument("--fg-pheno-col",required=True,help="Phenotype column in FG file")
@@ -201,13 +219,13 @@ if __name__ == "__main__":
 
     print("Load data...",end="\r")
     pheno_data_ = pd.read_csv(args.phecode_source, sep = '\t')
-    map_data_ = pd.read_csv(args.map_source, sep = ',', dtype={args.map_pheno_col:str})
+    map_data_ = pd.read_csv(args.map_source, sep = '\t', dtype={args.map_pheno_col:str})
     fg_data_ = pd.read_csv(args.fg_source, sep = '\t')
     print("Load data... Done")
 
     #clean phecode data
     pheno_data = pheno_data_.copy().fillna("")
-    pheno_data=phenotype_data_filtering(pheno_data)
+    #pheno_data=phenotype_data_filtering(pheno_data)
     map_data = clean_map_data(map_data_.copy(), args.map_icd_col)
 
     print("Prepare data for joining...")
