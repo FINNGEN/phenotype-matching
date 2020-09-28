@@ -8,7 +8,9 @@ The similarity is calculated as follows:
 
 FinnGen ICD10 codes are defined as a regular expression that matches some set of ICD-10 codes. As for Phecodes, the PheCode is enumerated for many ICD-10 codes.
 
-The similarity is then calculated by counting, how many of a phecode's icd codes were matched by the FG regex. This is then divided by the total number of phecode icd codes.
+The FinnGen matching ICD10 codes are acquired by enumerating the ICD10 codes that match a FinnGen endpoint's ICD10 regex.
+
+The similarity score is then calculated by dividing the size of the FG ICD10 codes' and Phecode ICD10 codes' intersection by the size of their union.
 
 ## Data sources
 
@@ -30,12 +32,12 @@ pip3 install pandas numpy
 
 Map FG endpoints to UKBB endpoints (each row contains UKBB/PheCode endpoint, and has the best matching FG endpoint on a column):
 ```
-Scripts/phecode_to_fg.py --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-col-phe pheno --pheno-col-fg NAME --pheno-col-map PHECODE --include-col-fg INCLUDE --icd-col-map ICD10 --icd-col-fg HD_ICD_10 --phenotype-type-col data_type --out OUTPUT_FILE.tsv
+Scripts/phenomatch.py --main-table phecode --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-pheno-col pheno --fg-pheno-col NAME --map-pheno-col PHECODE --fg-inc-col INCLUDE --map-icd-col ICD10 --fg-icd-col HD_ICD_10 --pheno-type-col data_type --out OUTPUT_FILE.tsv
 ```
 
 Map UKBB endpoints to FG endpoints (each row contains one FG endpoint, and has the best matching UKBB endpoint on a column):
 ```
-Scripts/fg_to_phecode.py --source1 data/finngen_R4_endpoints_utf8.tsv --source2 data/phecode_map_icd10.tsv --pheno-col-1 NAME --pheno-col-2 PHECODE --icd-col-1 HD_ICD_10 --icd-col-2 ICD10 --out OUTPUT_FILE.tsv
+Scripts/phenomatch.py --main-table finngen --phecode-source data/phenos_full_ukbb_gwas_exome_run.tsv --fg-source data/finngen_R4_endpoints_utf8.tsv --map-source data/Phecode_map_v1_2_icd10_beta.csv  --pheno-pheno-col pheno --fg-pheno-col NAME --map-pheno-col PHECODE --fg-inc-col INCLUDE --map-icd-col ICD10 --fg-icd-col HD_ICD_10 --pheno-type-col data_type --out OUTPUT_FILE.tsv
 ```
 ## Acknowledgements
 Tuomo Kiiskinen for the original matching algorithm  
