@@ -21,13 +21,13 @@ UKBB endpoint listing: ??
 ## Input data
 
 ### Phecode/ICD10 endpoints
-The file should contain a column for the Phecode/ICD10 code, and a column for its type, which can be either 'phecode' or 'icd10'. The user is responsible for filtering and transforming the input data.
+The file should contain a column for the Phecode/ICD10 code, and a column for its type, which can be either 'phecode' or 'icd10'. The user is responsible for filtering and transforming the input data. File separator is configurable.
 
 ### Phecode<->ICD10 mapping file
-The file should be a many-to-many mapping for ICD10<->Phecode endpoints, with one mapping per line. The file should have a column for the phecodes, as well as one for the icd10s.
+The file should be a many-to-many mapping for ICD10<->Phecode endpoints, with one mapping per line. The file should have a column for the phecodes, as well as one for the icd10s. File separator is configurable.
 
 ### FinnGen endpoint file
-The file should be the same as the finngen endpoint definitions.
+The file should be the same as the finngen endpoint definitions. File separator is configurable.
 
 ## Installation
 
