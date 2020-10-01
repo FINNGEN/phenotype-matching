@@ -5,7 +5,7 @@ import argparse, re
 from typing import AbstractSet, List, Dict, Optional, NamedTuple
 import itertools
 from tree import *
-from join import *
+from join import Endpoint, EndpointMatch, Result
 from constants import FG_REGEX_COL, FG_MATCHING_ICD, ICD_MAP_COL
 
 def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str, rec: bool=False, nodeset: Optional[AbstractSet]=None) -> Tree :
