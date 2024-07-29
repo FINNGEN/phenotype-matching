@@ -121,11 +121,15 @@ def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno
     phecode_data = phecode_data.drop(columns=[map_pheno_col])
 
     #For icd10 codes: get all matching ICD10 codes by matching the icd10 code to the list of icd codes in map file
-    icd_codes = get_icd_codes(map_data,map_icd_col)
-    icd_data[ICD_MAP_COL] = icd_data[pheno_pheno_col].apply(lambda x:str(x).replace(".",""))
-    icd_data[ICD_MAP_COL] = icd_data[ICD_MAP_COL].apply(lambda x:";".join( list(set(get_matches(x,icd_codes))) ) )
+    if not icd_data.empty:
+        icd_codes = get_icd_codes(map_data,map_icd_col)
+        icd_data[ICD_MAP_COL] = icd_data[pheno_pheno_col].apply(lambda x:str(x).replace(".",""))
+        icd_data[ICD_MAP_COL] = icd_data[ICD_MAP_COL].apply(lambda x:";".join( list(set(get_matches(x,icd_codes))) ) )
+        
+        pheno_data = pd.concat([phecode_data,icd_data],sort=False).reset_index(drop=True)
+    else:
+        pheno_data = phecode_data.reset_index(drop=True)
     
-    pheno_data = pd.concat([phecode_data,icd_data],sort=False).reset_index(drop=True)
     pheno_data = pheno_data.fillna("")
 
     return pheno_data

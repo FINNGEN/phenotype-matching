@@ -19,29 +19,40 @@ if __name__ == "__main__":
     phecode_parser.add_argument("--phecode-source",required=True,help="Phecode/ICD10 file with phenotypes that are to be matched with FG data")
     phecode_parser.add_argument("--pheno-pheno-col",required=True,help="Phenotype column in phecode/ICD10 file")
     phecode_parser.add_argument("--pheno-type-col",required=True,help="Phenotype type column in PheCode/ICD10 file")
-    phecode_parser.add_argument("--pheno-sep",default='\t',help="Phecode file separator")
+    phecode_parser.add_argument("--pheno-sep",default="\t",help="Phecode file separator")
     #Mapping data
     mapping_parser = parser.add_argument_group("mapping")
     mapping_parser.add_argument("--map-source",required=True,help="Phecode/ICD10 mapping file")
     mapping_parser.add_argument("--map-pheno-col",required=True,help="PheCode column in Phecode/ICD10 mapping")
     mapping_parser.add_argument("--map-icd-col",required=True,help="ICD10 column in Phe/ICD mapping")
-    mapping_parser.add_argument("--map-sep",default='\t',help="mapping file separator")
+    mapping_parser.add_argument("--map-sep",default="\t",help="mapping file separator")
     #FinnGen data
     fg_parser = parser.add_argument_group("finngen")
     fg_parser.add_argument("--fg-source",required=True,help="FinnGen file")
     fg_parser.add_argument("--fg-pheno-col",required=True,help="Phenotype column in FG file")
     fg_parser.add_argument("--fg-icd-col",required=True,nargs="+",help="ICD10 columns in FG file")
     fg_parser.add_argument("--fg-inc-col",required=True,help="The column which lists the FG endpoints included in an endpoint")
-    fg_parser.add_argument("--fg-sep",default='\t',help="FinnGen file separator")
+    fg_parser.add_argument("--fg-sep",default="\t",help="FinnGen file separator")
 
     args=parser.parse_args()
 
     join_direction = args.main_table
 
     print("Load data...",end="\r")
-    pheno_data_ = pd.read_csv(args.phecode_source, sep = args.pheno_sep,usecols=[args.pheno_pheno_col, args.pheno_type_col])
-    map_data_ = pd.read_csv(args.map_source, sep = args.map_sep, dtype={args.map_pheno_col:str},usecols=[args.map_pheno_col, args.map_icd_col])
-    fg_data_ = pd.read_csv(args.fg_source, sep = args.fg_sep,na_values="NA",usecols=args.fg_icd_col+[args.fg_pheno_col, args.fg_inc_col])
+    pheno_data_ = pd.read_csv(args.phecode_source,
+                              sep = args.pheno_sep,
+                              dtype = {args.pheno_pheno_col:str},
+                              usecols = [args.pheno_pheno_col, args.pheno_type_col],
+                              encoding = "unicode_escape")
+    map_data_ = pd.read_csv(args.map_source,
+                            sep = args.map_sep,
+                            dtype = {args.map_pheno_col:str},
+                            usecols = [args.map_pheno_col, args.map_icd_col])
+    fg_data_ = pd.read_csv(args.fg_source,
+                           sep = args.fg_sep,
+                           na_values = "NA",
+                           usecols = args.fg_icd_col + [args.fg_pheno_col, args.fg_inc_col],
+                           encoding = "unicode_escape")
     print("Load data... Done")
 
     print("Prepare data for joining...")
