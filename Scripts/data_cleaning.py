@@ -51,6 +51,27 @@ def get_matches(reg: str, lst: List[str]) -> List[str]:
         return []
     return retlist
 
+def format_regex_from_icd_codes(icd_codes: List[str]) -> str:
+    """Format a regex from a list of ICD codes
+    """
+    cl = sorted(list(set(icd_codes)), key = len)
+    matched = []
+    for c_a in cl:
+        for c_b in cl:
+            if c_b in matched:
+                continue
+            if c_a == c_b:
+                continue
+            if c_a in c_b:
+                matched.append(c_b)
+    regex = [c for c in cl if c not in matched]
+    return "|".join(regex)
+
+def format_regex_from_icd_string(icd_string: str) -> str:
+    """Format a regex from a string of ICD codes
+    """
+    return format_regex_from_icd_codes(icd_string.split("|"))
+
 def create_fg_endpoints(fg_df: pd.DataFrame, icd_codes: List[str],fg_pheno_col)-> List[Endpoint]:
     """Create the finngen endpoint list
     """
@@ -70,11 +91,12 @@ def create_phecode_endpoints(phecode_df: pd.DataFrame, pheno_pheno_col: str) -> 
     """
     out=[]
     for t in phecode_df.itertuples():
+        icd_codes = getattr(t,ICD_MAP_COL).split(";")
         out.append(
             Endpoint(
                 getattr(t,pheno_pheno_col),
-                set(getattr(t,ICD_MAP_COL).split(";")),
-                ""
+                set(icd_codes),
+                format_regex_from_icd_codes(icd_codes)
             )
         )
     return out
@@ -161,5 +183,8 @@ def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: st
     fg_data.loc[no_includes,FG_REGEX_COL] = fg_data.loc[no_includes,"fg_icd_regex"]
     for t in fg_data.loc[includes,:].itertuples():
         fg_data.loc[getattr(t,"Index"),FG_REGEX_COL] = solve_includes(fg_data,getattr(t,fg_pheno_col),fg_pheno_col,"fg_icd_regex",fg_inc_col)
+
+    #format regexes
+    #fg_data[FG_REGEX_COL] = fg_data[FG_REGEX_COL].apply(format_regex_from_icd_string)
 
     return fg_data

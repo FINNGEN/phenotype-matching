@@ -15,6 +15,7 @@ class EndpointMatch(NamedTuple):
     endpoint_1: Endpoint
     endpoint_2: Endpoint
     score: float
+    info: str
 
 class Result(NamedTuple):
     endpoint_1: str
@@ -24,7 +25,13 @@ class Result(NamedTuple):
     matches_2: str
     regex_1: str
     regex_2: str
+    info: str
     other_hits: str
+
+def equal_regex(regex_1: str, regex_2: str) -> bool:
+    """Check if two regex are equal
+    """
+    return set(regex_1.split("|")) == set(regex_2.split("|"))
 
 def union_similarity(match_set: AbstractSet[str], match_list: AbstractSet[str]):
     intersection = match_set.intersection(match_list)
@@ -40,18 +47,25 @@ def match_endpoints(endpoints_1: List[Endpoint], endpoints_2: List[Endpoint]) ->
         if end_1.matches:
             for end_2 in endpoints_2:
                 if end_2.matches:
+                    info = ''
                     score = union_similarity(end_1.matches, end_2.matches)
+                    regex_match = equal_regex(end_1.regex, end_2.regex)
+                    if regex_match:
+                        score = 1.0
+                        info = 'regex_match'
                     if score>0.0:
                         matches.append(EndpointMatch(
                             end_1,
                             end_2,
-                            score
+                            score,
+                            info
                         ))
         else:
             matches.append(EndpointMatch(
                         end_1,
                         nomatch,
-                        0.0
+                        0.0,
+                        "no_match"
                     ))
     return matches
 
@@ -79,7 +93,8 @@ def process_matches(matches: List[EndpointMatch]) -> List[Result] :
             ";".join(best_match.endpoint_2.matches),
             best_match.endpoint_1.regex,
             best_match.endpoint_2.regex,
-            other_matches
+            best_match.info,
+            other_matches,
         ))
     return out
 
