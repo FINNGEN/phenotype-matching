@@ -31,7 +31,7 @@ class Result(NamedTuple):
 def equal_regex(regex_1: str, regex_2: str) -> bool:
     """Check if two regex are equal
     """
-    return set(regex_1.split("|")) == set(regex_2.split("|"))
+    return set(regex_1.split("|")) == set(regex_2.split("|")) and regex_1 != ""
 
 def union_similarity(match_set: AbstractSet[str], match_list: AbstractSet[str]):
     intersection = match_set.intersection(match_list)

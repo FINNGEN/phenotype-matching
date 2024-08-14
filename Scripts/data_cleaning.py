@@ -51,10 +51,10 @@ def get_matches(reg: str, lst: List[str]) -> List[str]:
         return []
     return retlist
 
-def format_regex_from_icd_codes(icd_codes: List[str]) -> str:
+def format_regex_from_icd_codes(icd_codes: AbstractSet[str]) -> str:
     """Format a regex from a list of ICD codes
     """
-    cl = sorted(list(set(icd_codes)), key = len)
+    cl = sorted(list(icd_codes), key = len)
     matched = []
     for c_a in cl:
         for c_b in cl:
@@ -70,7 +70,7 @@ def format_regex_from_icd_codes(icd_codes: List[str]) -> str:
 def format_regex_from_icd_string(icd_string: str) -> str:
     """Format a regex from a string of ICD codes
     """
-    return format_regex_from_icd_codes(icd_string.split("|"))
+    return format_regex_from_icd_codes(set(icd_string.split("|")))
 
 def create_fg_endpoints(fg_df: pd.DataFrame, icd_codes: List[str],fg_pheno_col)-> List[Endpoint]:
     """Create the finngen endpoint list
@@ -91,11 +91,11 @@ def create_phecode_endpoints(phecode_df: pd.DataFrame, pheno_pheno_col: str) -> 
     """
     out=[]
     for t in phecode_df.itertuples():
-        icd_codes = getattr(t,ICD_MAP_COL).split(";")
+        icd_codes = set(getattr(t,ICD_MAP_COL).split(";"))
         out.append(
             Endpoint(
                 getattr(t,pheno_pheno_col),
-                set(icd_codes),
+                icd_codes,
                 format_regex_from_icd_codes(icd_codes)
             )
         )
