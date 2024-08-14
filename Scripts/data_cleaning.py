@@ -62,7 +62,7 @@ def format_regex_from_icd_codes(icd_codes: AbstractSet[str]) -> str:
                 continue
             if c_a == c_b:
                 continue
-            if c_a in c_b:
+            if c_a == c_b[:len(c_a)]:
                 matched.append(c_b)
     regex = [c for c in cl if c not in matched]
     return "|".join(regex)
