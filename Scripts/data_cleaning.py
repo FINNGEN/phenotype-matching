@@ -1,12 +1,11 @@
 #! /usr/bin/env python3
 
-import pandas as pd, numpy as np #typing: ignore
-import argparse, re
-from typing import AbstractSet, List, Dict, Optional, NamedTuple
-import itertools
+import pandas as pd, numpy as np
+import re
+from typing import AbstractSet, List, Optional
 from tree import *
-from join import Endpoint, EndpointMatch, Result
-from constants import FG_REGEX_COL, FG_MATCHING_ICD, ICD_MAP_COL
+from join import Endpoint
+from constants import FG_REGEX_COL, ICD_MAP_COL
 
 def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str, rec: bool=False, nodeset: Optional[AbstractSet]=None) -> Tree :
     """Build a tree from the include dependency chains, removing any cycles if necessary.
@@ -35,7 +34,9 @@ def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, i
 def solve_includes(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str) -> str:
     """Solve regex column when multiple endpoints are included in endpoint. Handles cyclical cases. Does not handle missing phenotype names.
     """
-    icds = "|".join(a for a in get_tree_nodes( build_dependency_tree(fg_df,pheno,pheno_colname,icd_colname,include_colname)).values() if a != "")
+    icd_list = list(set([a for a in get_tree_nodes( build_dependency_tree(fg_df,pheno,pheno_colname,icd_colname,include_colname)).values() if a != ""]))
+    icd_list.sort()
+    icds = "|".join(icd_list)
     return icds
 
 def get_icd_codes(map_data: pd.DataFrame, icd_column: str) -> List[str]:
@@ -105,7 +106,8 @@ def clean_map_data(map_data: pd.DataFrame, map_icd_col: str) -> pd.DataFrame:
     """Clean up map data
     """
     map_data = map_data.fillna("")
-    map_data[map_icd_col] =map_data[map_icd_col].apply(lambda x: str(x).replace(".",""))
+    map_data[map_icd_col] = map_data[map_icd_col].apply(lambda x: str(x).replace(".",""))
+    map_data = map_data.drop_duplicates()
     return map_data
 
 def create_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno_pheno_col: str, pheno_type_col: str, map_pheno_col: str, map_icd_col: str)-> pd.DataFrame:
@@ -167,13 +169,17 @@ def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: st
     """Data preprocessing for FinnGen data
     """
     fg_data=fg_data.dropna(subset = fg_icd_col +[fg_inc_col],how="all")
+
+    #remove dots from ICD codes
+    fg_data[fg_icd_col] = fg_data[fg_icd_col].applymap(lambda x: str(x).replace(".","") if pd.notna(x) else "")
+
+    #simplify regexes (remove unnecessary [0-9] ranges)
+    fg_data[fg_icd_col] = fg_data[fg_icd_col].applymap(lambda x: re.sub("\[0-9\]$", "", re.sub("\[0-9\]\|", "|", x)) if pd.notna(x) else "")
     
     #combine multiple regex columns into one
-    fg_data[fg_icd_col] = fg_data[fg_icd_col].applymap(lambda x: str(x).replace(".","") if pd.notna(x) else "")
     fg_data["fg_icd_regex"] = fg_data[fg_icd_col].apply(fg_combine_regexes,axis=1)
 
     #add included phenotypes' regexes to phenotypes regexes
-
     fg_data[FG_REGEX_COL]=np.nan
 
     #index the FG endpoints with and without included columns. Those without will have their regexes unchanged,

@@ -1,4 +1,6 @@
-from typing import AbstractSet, List, Dict, Optional, NamedTuple, Any
+#! /usr/bin/env python3
+
+from typing import AbstractSet, List, NamedTuple
 import pandas as pd
 import itertools
 

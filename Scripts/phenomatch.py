@@ -1,13 +1,10 @@
 #! /usr/bin/env python3
 
-import pandas as pd, numpy as np #typing: ignore
-import argparse, re
-from typing import AbstractSet, List, Dict, Optional, NamedTuple, Any
-import itertools
-from tree import * 
+import pandas as pd
+import argparse
+from tree import *
 from data_cleaning import *
-from join import match_endpoints, process_matches, write_matches 
-from constants import FG_REGEX_COL, FG_MATCHING_ICD, ICD_MAP_COL
+from join import match_endpoints, process_matches, write_matches
 
 if __name__ == "__main__":
 
