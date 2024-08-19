@@ -46,6 +46,7 @@ def match_endpoints(endpoints_1: List[Endpoint], endpoints_2: List[Endpoint]) ->
     nomatch = Endpoint("NO MATCH",{},"")
     matches = []
     for end_1 in endpoints_1:
+        found_match = False
         if end_1.matches:
             for end_2 in endpoints_2:
                 if end_2.matches:
@@ -56,12 +57,20 @@ def match_endpoints(endpoints_1: List[Endpoint], endpoints_2: List[Endpoint]) ->
                         score = 1.0
                         info = 'regex_match'
                     if score>0.0:
+                        found_match = True
                         matches.append(EndpointMatch(
                             end_1,
                             end_2,
                             score,
                             info
                         ))
+            if not found_match:
+                matches.append(EndpointMatch(
+                    end_1,
+                    nomatch,
+                    0.0,
+                    "no_match"
+                ))
         else:
             matches.append(EndpointMatch(
                         end_1,
