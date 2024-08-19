@@ -63,7 +63,7 @@ def format_regex_from_icd_codes(icd_codes: AbstractSet[str]) -> str:
                 continue
             if c_a == c_b:
                 continue
-            if c_a == c_b[:len(c_a)]:
+            if re.match(c_a, c_b):
                 matched.append(c_b)
     regex = [c for c in cl if c not in matched]
     return "|".join(regex)
@@ -71,7 +71,27 @@ def format_regex_from_icd_codes(icd_codes: AbstractSet[str]) -> str:
 def format_regex_from_icd_string(icd_string: str) -> str:
     """Format a regex from a string of ICD codes
     """
-    return format_regex_from_icd_codes(set(icd_string.split("|")))
+    return format_regex_from_icd_codes(set(tokenize_icd_string(icd_string)))
+
+def tokenize_icd_string(icd_string: str) -> List[str]:
+    """Tokenize an ICD string.
+    Very crude way to split most of the regexes in FG definitions.
+    """
+    tokens = []
+    token = ""
+    bracket_start_seen = False
+    for c in icd_string:
+        if c == "[":
+            bracket_start_seen = True
+        if c == "]":
+            bracket_start_seen = False
+        if c == "|" and not bracket_start_seen:
+            tokens.append(token)
+            token = ""
+        else:
+            token += c
+    tokens.append(token)
+    return tokens
 
 def create_fg_endpoints(fg_df: pd.DataFrame, icd_codes: List[str],fg_pheno_col)-> List[Endpoint]:
     """Create the finngen endpoint list
@@ -191,6 +211,6 @@ def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: st
         fg_data.loc[getattr(t,"Index"),FG_REGEX_COL] = solve_includes(fg_data,getattr(t,fg_pheno_col),fg_pheno_col,"fg_icd_regex",fg_inc_col)
 
     #format regexes
-    #fg_data[FG_REGEX_COL] = fg_data[FG_REGEX_COL].apply(format_regex_from_icd_string)
+    fg_data[FG_REGEX_COL] = fg_data[FG_REGEX_COL].apply(format_regex_from_icd_string)
 
     return fg_data
