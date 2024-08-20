@@ -185,10 +185,12 @@ def fg_combine_regexes(x: List[str]) -> str:
     [reg_lst.append(tmp) for tmp in x if (((tmp not in reg_lst) and (tmp != "") )and (tmp != "$!$"))]
     return "|".join(reg_lst)
 
-def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: str, fg_pheno_col: str) -> pd.DataFrame:
+def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: str, fg_pheno_col: str, fg_cond_col: List[str]) -> pd.DataFrame:
     """Data preprocessing for FinnGen data
     """
-    fg_data=fg_data.dropna(subset = fg_icd_col +[fg_inc_col],how="all")
+    fg_data = fg_data.dropna(subset = fg_icd_col + [fg_inc_col], how = "all")
+    if fg_cond_col:
+        fg_data.loc[~fg_data.index.isin(fg_data.dropna(subset = fg_cond_col, how = "all").index)]
 
     #remove dots from ICD codes
     fg_data[fg_icd_col] = fg_data[fg_icd_col].applymap(lambda x: str(x).replace(".","") if pd.notna(x) else "")

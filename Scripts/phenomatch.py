@@ -29,6 +29,7 @@ if __name__ == "__main__":
     fg_parser.add_argument("--fg-pheno-col",required=True,help="Phenotype column in FG file")
     fg_parser.add_argument("--fg-icd-col",required=True,nargs="+",help="ICD10 columns in FG file")
     fg_parser.add_argument("--fg-inc-col",required=True,help="The column which lists the FG endpoints included in an endpoint")
+    fg_parser.add_argument("--fg-cond-col",required=False,nargs="+",help="The columns which add extra criteria for the endpoint. Any non-empty value will cause the endpoint to be excluded from matching")
     fg_parser.add_argument("--fg-sep",default="\t",help="FinnGen file separator")
 
     args=parser.parse_args()
@@ -45,10 +46,14 @@ if __name__ == "__main__":
                             sep = args.map_sep,
                             dtype = {args.map_pheno_col:str},
                             usecols = [args.map_pheno_col, args.map_icd_col])
+    
+    fg_usecols = args.fg_icd_col + [args.fg_pheno_col, args.fg_inc_col]
+    if args.fg_cond_col:
+        fg_usecols += args.fg_cond_col
     fg_data_ = pd.read_csv(args.fg_source,
                            sep = args.fg_sep,
                            na_values = "NA",
-                           usecols = args.fg_icd_col + [args.fg_pheno_col, args.fg_inc_col],
+                           usecols = fg_usecols,
                            encoding = "unicode_escape")
     print("Load data... Done")
 
@@ -58,7 +63,7 @@ if __name__ == "__main__":
     map_data = clean_map_data(map_data_.copy(), args.map_icd_col)
     icd_codes = get_icd_codes(map_data.copy(),args.map_icd_col)
     phecode_data = prepare_phecode_data(pheno_data, map_data, args.pheno_pheno_col, args.pheno_type_col,args.map_pheno_col, args.map_icd_col)
-    fg_data = prepare_fg_data(fg_data_.copy(), args.fg_icd_col, args.fg_inc_col, args.fg_pheno_col)
+    fg_data = prepare_fg_data(fg_data_.copy(), args.fg_icd_col, args.fg_inc_col, args.fg_pheno_col, args.fg_cond_col)
     fg_endpoints = create_fg_endpoints(fg_data,icd_codes,args.fg_pheno_col)
     phecode_endpoints = create_phecode_endpoints(phecode_data,args.pheno_pheno_col)
     print("Prepare data for joining... Done")
