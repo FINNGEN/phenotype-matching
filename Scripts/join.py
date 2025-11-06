@@ -3,6 +3,7 @@
 from typing import AbstractSet, List, NamedTuple
 import pandas as pd
 import itertools
+from progress import Progress_bar
 
 class Endpoint(NamedTuple):
     """Endpoint with a name and matching ICD10 codes
@@ -10,6 +11,7 @@ class Endpoint(NamedTuple):
     name: str
     matches: AbstractSet[str]
     regex: str
+    excludes: bool
 
 class EndpointMatch(NamedTuple):
     """Match between endpoints
@@ -43,44 +45,48 @@ def union_similarity(match_set: AbstractSet[str], match_list: AbstractSet[str]):
 def match_endpoints(endpoints_1: List[Endpoint], endpoints_2: List[Endpoint]) -> List[EndpointMatch]:
     """Join endpoints by calculating union similarity and output all matches over those endpoints 
     """
-    nomatch = Endpoint("NO MATCH",{},"")
+    nomatch = Endpoint("NO MATCH",{},"", False)
     matches = []
-    for end_1 in endpoints_1:
-        found_match = False
-        if end_1.matches:
-            for end_2 in endpoints_2:
-                if end_2.matches:
-                    info = ''
-                    score = union_similarity(end_1.matches, end_2.matches)
-                    regex_match = equal_regex(end_1.regex, end_2.regex)
-                    if regex_match:
-                        score = 1.0
-                        info = 'regex_match'
-                    if score>0.0:
-                        found_match = True
-                        matches.append(EndpointMatch(
-                            end_1,
-                            end_2,
-                            score,
-                            info
-                        ))
-            if not found_match:
-                matches.append(EndpointMatch(
-                    end_1,
-                    nomatch,
-                    0.0,
-                    "no_match"
-                ))
-        else:
-            matches.append(EndpointMatch(
+    with Progress_bar as p:
+        for end_1 in p.track(endpoints_1, total=len(endpoints_1), description="Matching endpoints..."):
+            found_match = False
+            if end_1.matches:
+                for end_2 in endpoints_2:
+                    if end_2.matches:
+                        info = ''
+                        score = union_similarity(end_1.matches, end_2.matches)
+                        if not end_1.excludes and not end_2.excludes:
+                            regex_match = equal_regex(end_1.regex, end_2.regex)
+                            if regex_match:
+                                score = 1.0
+                                info = 'regex_match'
+                        else:
+                            info = 'Definition involves code exclusions'
+                        if score>0.0:
+                            found_match = True
+                            matches.append(EndpointMatch(
+                                end_1,
+                                end_2,
+                                score,
+                                info
+                            ))
+                if not found_match:
+                    matches.append(EndpointMatch(
                         end_1,
                         nomatch,
                         0.0,
                         "no_match"
                     ))
+            else:
+                matches.append(EndpointMatch(
+                            end_1,
+                            nomatch,
+                            0.0,
+                            "no_match"
+                        ))
     return matches
 
-def process_matches(matches: List[EndpointMatch]) -> List[Result] :
+def process_matches(matches: List[EndpointMatch], other_hits_n: int) -> List[Result] :
     """Aggregate the matches on endpoint_1, resulting in a list of best matches for endpoint 1
     """
     out=[]
@@ -94,7 +100,7 @@ def process_matches(matches: List[EndpointMatch]) -> List[Result] :
         #best match
         best_match = endpoint_matches[0]
         #others
-        other_matches = ";".join([f"{a.endpoint_2.name}|{a.score:.3g}" for a in endpoint_matches[1:] ])
+        other_matches = ";".join([f"{a.endpoint_2.name}|{a.score:.3g}" for a in endpoint_matches[1:(other_hits_n+1)] ])
 
         out.append(Result(
             best_match.endpoint_1.name,
@@ -114,4 +120,4 @@ def write_matches(matches: List[Result],out: str):
     Currently using pandas dataframe flattening as the parser
     """
     data = pd.DataFrame(matches)
-    data.to_csv(out,sep="\t",index=False)
+    data.to_csv(out, sep="\t", index=False, compression="infer")

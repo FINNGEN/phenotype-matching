@@ -7,6 +7,8 @@ from tree import *
 from join import Endpoint
 from constants import FG_REGEX_COL, ICD_MAP_COL
 
+from progress import Progress_bar
+
 def build_dependency_tree(fg_df: pd.DataFrame, pheno: str, pheno_colname: str, icd_colname: str, include_colname: str, rec: bool=False, nodeset: Optional[AbstractSet]=None) -> Tree :
     """Build a tree from the include dependency chains, removing any cycles if necessary.
     """
@@ -43,6 +45,15 @@ def get_icd_codes(map_data: pd.DataFrame, icd_column: str) -> List[str]:
     """Get List if ICD codes from ICD code map
     """
     return map_data[icd_column].unique()
+
+def get_icd_codes_from_file(icd_code_file: str) -> List[str]:
+    """Get List if ICD codes from ICD code file
+    """
+    icd_codes = []
+    with open(icd_code_file) as f:
+        for line in f:
+            icd_codes.append(line.strip())
+    return icd_codes
 
 def get_matches(reg: str, lst: List[str]) -> List[str]:
     """Match list of strings to regex, returning those strings that match the regex.
@@ -93,33 +104,52 @@ def tokenize_icd_string(icd_string: str) -> List[str]:
     tokens.append(token)
     return tokens
 
-def create_fg_endpoints(fg_df: pd.DataFrame, icd_codes: List[str],fg_pheno_col)-> List[Endpoint]:
+def create_fg_endpoints(fg_df: pd.DataFrame, icd_codes: List[str], fg_pheno_col: str, exclude_cols: List[str])-> List[Endpoint]:
     """Create the finngen endpoint list
     """
     out=[]
-    for t in fg_df.itertuples():
-        out.append(
-            Endpoint(
-                getattr(t,fg_pheno_col),
-                set(get_matches(getattr(t,FG_REGEX_COL),icd_codes ) ),
-                getattr(t,FG_REGEX_COL)
+    with Progress_bar as p:
+        for t in p.track(fg_df.itertuples(), total=len(fg_df), description="Creating FinnGen endpoints..."):
+            #get included icd codes
+            incl_icd_codes = set(get_matches(getattr(t, FG_REGEX_COL), icd_codes))
+            if exclude_cols:
+                #get excluded icd codes
+                excl_icd_codes = set()
+                for c in exclude_cols:
+                    if pd.notna(getattr(t,c)):
+                        excl_icd_codes.update(set(get_matches(getattr(t, c), icd_codes)))
+                #remove excluded icd codes from included icd codes
+                if excl_icd_codes:
+                    incl_icd_codes = incl_icd_codes - excl_icd_codes
+                    if not incl_icd_codes:
+                        print(f"Warning: FinnGen endpoint {getattr(t, fg_pheno_col)} has all ICD-10 codes excluded.")
+                        continue
+            out.append(
+                Endpoint(
+                    getattr(t, fg_pheno_col),
+                    incl_icd_codes,
+                    getattr(t, FG_REGEX_COL),
+                    True if excl_icd_codes else False
+                )
             )
-        )
     return out
 
-def create_phecode_endpoints(phecode_df: pd.DataFrame, pheno_pheno_col: str) -> List[Endpoint]:
+def create_phecode_endpoints(phecode_df: pd.DataFrame, icd_codes: List[str], pheno_pheno_col: str) -> List[Endpoint]:
     """Create phecode endpoint list
     """
     out=[]
-    for t in phecode_df.itertuples():
-        icd_codes = set(getattr(t,ICD_MAP_COL).split(";"))
-        out.append(
-            Endpoint(
-                getattr(t,pheno_pheno_col),
-                icd_codes,
-                format_regex_from_icd_codes(icd_codes)
+    with Progress_bar as p:
+        for t in p.track(phecode_df.itertuples(), total=len(phecode_df), description="Creating phecode endpoints..."):
+            icd_code_regex = format_regex_from_icd_codes(set(getattr(t,ICD_MAP_COL).split(";")))
+            incl_icd_codes = set(get_matches(icd_code_regex, icd_codes))
+            out.append(
+                Endpoint(
+                    getattr(t,pheno_pheno_col),
+                    incl_icd_codes,
+                    icd_code_regex,
+                    False
+                )
             )
-        )
     return out
 
 def clean_map_data(map_data: pd.DataFrame, map_icd_col: str) -> pd.DataFrame:
@@ -142,7 +172,7 @@ def create_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno_
 
     pass
 
-def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno_pheno_col: str, pheno_type_col: str, map_pheno_col: str, map_icd_col: str) -> pd.DataFrame:
+def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno_pheno_col: str, pheno_type_col: str, map_pheno_col: str, map_icd_col: str, filter: int) -> pd.DataFrame:
     """Data preprocessing for phecode data
     """
     # icd10 and phecode phenotype codes
@@ -162,7 +192,8 @@ def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno
         right_on=map_pheno_col,
         sort=False
         )
-    phecode_data = phecode_data.drop(columns=[map_pheno_col])
+    if map_pheno_col != pheno_pheno_col:
+        phecode_data = phecode_data.drop(columns=[map_pheno_col])
 
     #For icd10 codes: get all matching ICD10 codes by matching the icd10 code to the list of icd codes in map file
     if not icd_data.empty:
@@ -176,28 +207,47 @@ def prepare_phecode_data(pheno_data: pd.DataFrame, map_data: pd.DataFrame, pheno
     
     pheno_data = pheno_data.fillna("")
 
+    # Filter out phecodes mapping to code counts greater than filter threshold
+    if filter > 0:
+        pheno_data["code_count"] = pheno_data[ICD_MAP_COL].apply(lambda x: len(x.split(";")) if x else 0)
+        N = len(pheno_data)
+        pheno_data = pheno_data[pheno_data.code_count < filter]
+        if len(pheno_data) < N:
+            print(f"Removed {N-len(pheno_data)} phecodes mapping to more than {filter} ICD-10 codes.")
+
     return pheno_data
 
 def fg_combine_regexes(x: List[str]) -> str:
     """Combine regex expressions (with OR, not AND) into one regex.
     """
     reg_lst = []
-    [reg_lst.append(tmp) for tmp in x if (((tmp not in reg_lst) and (tmp != "") )and (tmp != "$!$"))]
+    [reg_lst.append(tmp) for tmp in x if tmp not in reg_lst and tmp != "" and tmp != "$!$" and tmp != "ANY"]
     return "|".join(reg_lst)
 
 def prepare_fg_data(fg_data: pd.DataFrame, fg_icd_col: List[str], fg_inc_col: str, fg_pheno_col: str, fg_cond_col: List[str]) -> pd.DataFrame:
     """Data preprocessing for FinnGen data
     """
+    N = len(fg_data)
     fg_data = fg_data.dropna(subset = fg_icd_col + [fg_inc_col], how = "all")
+    if len(fg_data) < N:
+        print(f"Removed {N-len(fg_data)} phenotypes with missing all ICD codes and included phenotypes.")
+
+    N = len(fg_data)
     if fg_cond_col:
-        fg_data.loc[~fg_data.index.isin(fg_data.dropna(subset = fg_cond_col, how = "all").index)]
+        fg_data = fg_data.loc[~fg_data.index.isin(fg_data.dropna(subset = fg_cond_col, how = "all").index)]
+        if len(fg_data) < N:
+            print(f"Removed {N-len(fg_data)} phenotypes with conditions.")
+        N = len(fg_data)
+
+    #remove phenotypes with '%' (mode) in any code column
+    for c in fg_icd_col:
+        fg_data = fg_data.loc[~fg_data[c].str.contains("%",na=False)]
+    if len(fg_data) < N:
+        print(f"Removed {N-len(fg_data)} phenotypes with '%' (mode) in ICD code.")
 
     #remove dots from ICD codes
     fg_data[fg_icd_col] = fg_data[fg_icd_col].applymap(lambda x: str(x).replace(".","") if pd.notna(x) else "")
 
-    #simplify regexes (remove unnecessary [0-9] ranges)
-    fg_data[fg_icd_col] = fg_data[fg_icd_col].applymap(lambda x: re.sub("\[0-9\]$", "", re.sub("\[0-9\]\|", "|", x)) if pd.notna(x) else "")
-    
     #combine multiple regex columns into one
     fg_data["fg_icd_regex"] = fg_data[fg_icd_col].apply(fg_combine_regexes,axis=1)
 
